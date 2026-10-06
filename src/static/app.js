@@ -24,8 +24,70 @@ document.addEventListener("DOMContentLoaded", () => {
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p class="availability"><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants">
+            <h5>Participants</h5>
+            <ul></ul>
+          </div>
         `;
+
+        const participantList = activityCard.querySelector(".participants ul");
+        details.participants.forEach((participant) => {
+          const participantItem = document.createElement("li");
+          participantItem.className = "participant-row";
+
+          const participantName = document.createElement("span");
+          participantName.textContent = participant;
+
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "delete-participant";
+          deleteButton.type = "button";
+          deleteButton.setAttribute(
+            "aria-label",
+            `Unregister ${participant} from ${name}`,
+          );
+          deleteButton.title = `Unregister ${participant}`;
+          deleteButton.innerHTML = `
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6" />
+            </svg>
+          `;
+          deleteButton.addEventListener("click", async () => {
+            deleteButton.disabled = true;
+
+            try {
+              const response = await fetch(
+                `/activities/${encodeURIComponent(name)}/participants/${encodeURIComponent(participant)}`,
+                { method: "DELETE" },
+              );
+              const result = await response.json();
+
+              if (!response.ok) {
+                throw new Error(result.detail || "Unable to unregister participant");
+              }
+
+              details.participants = details.participants.filter(
+                (registeredParticipant) => registeredParticipant !== participant,
+              );
+              participantItem.remove();
+
+              const availability = activityCard.querySelector(".availability");
+              const spotsLeft = details.max_participants - details.participants.length;
+              availability.textContent = `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} left`;
+              messageDiv.textContent = result.message;
+              messageDiv.className = "success";
+              messageDiv.classList.remove("hidden");
+            } catch (error) {
+              deleteButton.disabled = false;
+              messageDiv.textContent = error.message;
+              messageDiv.className = "error";
+              messageDiv.classList.remove("hidden");
+            }
+          });
+
+          participantItem.append(participantName, deleteButton);
+          participantList.appendChild(participantItem);
+        });
 
         activitiesList.appendChild(activityCard);
 
@@ -59,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await response.json();
 
       if (response.ok) {
+        await fetchActivities();
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
